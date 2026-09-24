@@ -1,0 +1,109 @@
+.container {
+  max-width: 750px;
+  margin: 20px auto;
+  background: #fff;
+  padding: 20px;
+  border: 1px solid #ddd;
+  border-radius: 4px;
+}
+
+h1 {
+  text-align: center;
+  margin-bottom: 15px;
+}
+
+.form-group {
+  display: flex;
+  gap: 8px;
+  margin-bottom: 10px;
+  flex-wrap: wrap;
+}
+
+.form-group input {
+  padding: 8px;
+  border: 1px solid #ccc;
+  border-radius: 3px;
+  flex: 1;
+  min-width: 140px;
+}
+
+button {
+  padding: 8px 14px;
+  border: 1px solid #ccc;
+  border-radius: 3px;
+  cursor: pointer;
+  background-color: #e8e8e8;
+}
+
+button:hover {
+  background-color: #ddd;
+}
+
+.btn-add {
+  background-color: #4CAF50;
+  color: white;
+  border-color: #4CAF50;
+}
+
+.btn-add:hover {
+  background-color: #45a049;
+}
+
+.btn-delete {
+  background-color: #e74c3c;
+  color: white;
+  border-color: #e74c3c;
+  padding: 5px 10px;
+  font-size: 13px;
+}
+
+.btn-delete:hover {
+  background-color: #c0392b;
+}
+
+.filters {
+  margin: 12px 0;
+  display: flex;
+  gap: 8px;
+}
+
+.btn-filter.active {
+  background-color: #337ab7;
+  color: white;
+  border-color: #337ab7;
+}
+
+.error {
+  color: red;
+  background-color: #ffe0e0;
+  padding: 8px;
+  border-radius: 3px;
+  margin-bottom: 10px;
+  font-size: 14px;
+}
+
+table {
+  width: 100%;
+  border-collapse: collapse;
+  margin-top: 8px;
+}
+
+th, td {
+  padding: 10px;
+  text-align: left;
+  border: 1px solid #ddd;
+}
+
+th {
+  background-color: #f0f0f0;
+}
+
+.stats {
+  margin-top: 15px;
+  padding: 10px;
+  background-color: #f0f0f0;
+  border: 1px solid #ddd;
+  border-radius: 3px;
+  display: flex;
+  justify-content: space-between;
+}
