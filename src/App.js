@@ -18,6 +18,14 @@ const App = () => {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
   const [playerName, setPlayerName] = useState('');
+  const [history, setHistory] = useState(() => {
+    try {
+      const saved = localStorage.getItem('ltw_trieuphu_history');
+      return saved ? JSON.parse(saved) : [];
+    } catch {
+      return [];
+    }
+  });
 
   useEffect(() => {
     const controller = new AbortController();
@@ -41,6 +49,29 @@ const App = () => {
     };
   }, []);
 
+  useEffect(() => {
+    try {
+      localStorage.setItem('ltw_trieuphu_history', JSON.stringify(history));
+    } catch (e) {
+      console.error(e);
+    }
+  }, [history]);
+
+  const handleGameOver = ({ name, prize, correctCount }) => {
+    const newRecord = {
+      id: Date.now(),
+      name,
+      prize,
+      correctCount,
+      playedAt: new Date().toLocaleString('vi-VN'),
+    };
+    setHistory((prev) => [newRecord, ...prev]);
+  };
+
+  const handleClearHistory = () => {
+    setHistory([]);
+  };
+
   return (
     <Routes>
       <Route path="/" element={<Layout loading={loading} error={error} />}>
@@ -50,6 +81,7 @@ const App = () => {
             <Home
               playerName={playerName}
               setPlayerName={setPlayerName}
+              history={history}
             />
           }
         />
@@ -67,11 +99,20 @@ const App = () => {
             <Play
               questions={questions}
               playerName={playerName}
+              onGameOver={handleGameOver}
             />
           }
         />
         <Route path="result" element={<Result />} />
-        <Route path="history" element={<History />} />
+        <Route
+          path="history"
+          element={
+            <History
+              history={history}
+              onClearHistory={handleClearHistory}
+            />
+          }
+        />
         <Route path="*" element={<NotFound />} />
       </Route>
     </Routes>

@@ -37,8 +37,9 @@ const QuestionDetail = ({ questions = [] }) => {
               <div
                 key={idx}
                 className={`option-item ${isCorrect ? 'correct-option' : ''}`}
+                style={isCorrect ? { backgroundColor: '#22c55e', color: '#ffffff' } : {}}
               >
-                <span className="option-letter">{LETTERS[idx]}.</span>
+                <span className="option-letter">{LETTERS[idx]}. </span>
                 <span className="option-text">{option}</span>
                 {isCorrect && (
                   <span className="correct-tag"> (Đáp án đúng)</span>

@@ -44,18 +44,18 @@ const Result = () => {
         <h2 className="result-headline">{getReasonTitle(reason)}</h2>
 
         <div className="result-info-box">
-          <div className="result-info-row">
-            <span className="info-label">Người chơi:</span>
+          <p className="result-info-row">
+            <span className="info-label">Người chơi: </span>
             <span className="info-value">{name}</span>
-          </div>
-          <div className="result-info-row">
-            <span className="info-label">Số câu trả lời đúng:</span>
+          </p>
+          <p className="result-info-row">
+            <span className="info-label">Số câu trả lời đúng: </span>
             <span className="info-value">{correctCount}</span>
-          </div>
-          <div className="result-info-row highlight-row">
-            <span className="info-label">Tiền thưởng:</span>
+          </p>
+          <p className="result-info-row highlight-row">
+            <span className="info-label">Tiền thưởng: </span>
             <span className="info-value prize-value">{formatMoney(prize)}</span>
-          </div>
+          </p>
         </div>
 
         <div className="result-actions">

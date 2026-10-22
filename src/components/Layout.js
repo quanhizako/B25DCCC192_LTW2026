@@ -1,8 +1,10 @@
 import React from 'react';
-import { Outlet } from 'react-router-dom';
+import { Outlet, useLocation } from 'react-router-dom';
 import NavBar from './NavBar';
 
 const Layout = ({ loading, error }) => {
+  const location = useLocation();
+
   return (
     <div className="app-layout">
       <NavBar />
@@ -17,7 +19,9 @@ const Layout = ({ loading, error }) => {
             <p className="status-message error-message">Không tải được câu hỏi</p>
           </div>
         ) : (
-          <Outlet />
+          <div key={location.pathname} className="page-transition-wrapper">
+            <Outlet />
+          </div>
         )}
       </main>
     </div>

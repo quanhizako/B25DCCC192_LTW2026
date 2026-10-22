@@ -23,7 +23,15 @@ const MoneyLadder = ({ currentQuestionIndex }) => {
           if (item.isPassed) itemClass += ' passed-step';
 
           return (
-            <li key={item.questionNumber} className={itemClass}>
+            <li
+              key={item.questionNumber}
+              className={itemClass}
+              style={{
+                fontWeight: item.isMilestone ? 'bold' : 'normal',
+                backgroundColor: item.isActive ? '#ffd700' : undefined,
+                color: item.isActive ? '#060b24' : undefined,
+              }}
+            >
               <span className="ladder-step-num">{item.questionNumber}</span>
               <span className="ladder-step-prize">
                 {formatMoney(item.prize)}

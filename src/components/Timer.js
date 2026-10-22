@@ -4,7 +4,10 @@ const Timer = ({ timeLeft }) => {
   const isWarning = timeLeft <= 10;
 
   return (
-    <div className={`timer-container ${isWarning ? 'timer-danger' : ''}`}>
+    <div
+      className={`timer-container ${isWarning ? 'timer-danger' : ''}`}
+      style={{ color: isWarning ? 'red' : undefined }}
+    >
       <span className="timer-icon">⏱️</span>
       <span className="timer-text">Còn {timeLeft} giây</span>
     </div>

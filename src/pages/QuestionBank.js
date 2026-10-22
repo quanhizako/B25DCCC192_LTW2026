@@ -16,7 +16,10 @@ const QuestionBank = ({ questions = [] }) => {
 
   const filteredQuestions = questions.filter((q) => {
     const matchesLevel =
-      selectedLevel === 'all' || String(q.level) === String(selectedLevel);
+      selectedLevel === 'all' ||
+      selectedLevel === 'Tất cả' ||
+      String(q.level) === String(selectedLevel) ||
+      LEVELS[q.level] === selectedLevel;
     const matchesSearch = q.question
       .toLowerCase()
       .includes(searchQuery.toLowerCase().trim());
@@ -57,7 +60,7 @@ const QuestionBank = ({ questions = [] }) => {
       </div>
 
       <div className="question-count-badge">
-        Có {filteredQuestions.length} câu hỏi.
+        Có {filteredQuestions.length} câu hỏi
       </div>
 
       <div className="table-responsive">

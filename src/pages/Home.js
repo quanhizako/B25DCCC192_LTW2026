@@ -1,7 +1,8 @@
 import React from 'react';
 import { useNavigate } from 'react-router-dom';
+import { formatMoney } from '../data';
 
-const Home = ({ playerName, setPlayerName }) => {
+const Home = ({ playerName, setPlayerName, history = [] }) => {
   const navigate = useNavigate();
 
   const handleStartGame = (e) => {
@@ -11,11 +12,22 @@ const Home = ({ playerName, setPlayerName }) => {
     }
   };
 
+  const highestRecord =
+    history.length > 0
+      ? [...history].sort((a, b) => b.prize - a.prize)[0]
+      : null;
+
   return (
     <div className="page-container home-page">
       <div className="home-hero">
         <h1 className="main-title">AI LÀ TRIỆU PHÚ</h1>
         <p className="subtitle">Phiên bản Lập trình Web đặc biệt</p>
+
+        {highestRecord && (
+          <div className="record-badge">
+            {`Kỷ lục: ${formatMoney(highestRecord.prize)} – ${highestRecord.name}`}
+          </div>
+        )}
       </div>
 
       <div className="rules-section">
@@ -38,6 +50,11 @@ const Home = ({ playerName, setPlayerName }) => {
           <li>
             Giải thưởng cao nhất là <strong>250.000.000 đ</strong> khi hoàn
             thành 15 câu!
+          </li>
+          <li>
+            Bạn có 3 quyền trợ giúp: <strong>50:50</strong>,{' '}
+            <strong>Hỏi ý kiến khán giả</strong>, và{' '}
+            <strong>Dừng cuộc chơi</strong>.
           </li>
         </ul>
       </div>
