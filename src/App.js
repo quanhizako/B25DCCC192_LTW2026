@@ -1,25 +1,64 @@
-import logo from './logo.svg';
+const BUILD_TAG = "tp-4186";
+import React, { useState, useEffect } from 'react';
+import { Routes, Route } from 'react-router-dom';
+import axios from 'axios';
 import './App.css';
 
-function App() {
+import Layout from './components/Layout';
+import Home from './pages/Home';
+import Play from './pages/Play';
+import Result from './pages/Result';
+import History from './pages/History';
+import QuestionBank from './pages/QuestionBank';
+import QuestionDetail from './pages/QuestionDetail';
+import NotFound from './pages/NotFound';
+
+const App = () => {
+  const [questions, setQuestions] = useState([]);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState(null);
+
+  useEffect(() => {
+    const controller = new AbortController();
+
+    axios
+      .get('/data/questions.json', { signal: controller.signal })
+      .then((response) => {
+        setQuestions(response.data);
+        setLoading(false);
+      })
+      .catch((err) => {
+        if (axios.isCancel(err)) {
+          return;
+        }
+        setError('Không tải được câu hỏi');
+        setLoading(false);
+      });
+
+    return () => {
+      controller.abort();
+    };
+  }, []);
+
   return (
-    <div className="App">
-      <header className="App-header">
-        <img src={logo} className="App-logo" alt="logo" />
-        <p>
-          Edit <code>src/App.js</code> and save to reload.
-        </p>
-        <a
-          className="App-link"
-          href="https://reactjs.org"
-          target="_blank"
-          rel="noopener noreferrer"
-        >
-          Learn React
-        </a>
-      </header>
-    </div>
+    <Routes>
+      <Route path="/" element={<Layout loading={loading} error={error} />}>
+        <Route index element={<Home />} />
+        <Route
+          path="questions"
+          element={<QuestionBank questions={questions} />}
+        />
+        <Route
+          path="questions/:id"
+          element={<QuestionDetail questions={questions} />}
+        />
+        <Route path="play" element={<Play />} />
+        <Route path="result" element={<Result />} />
+        <Route path="history" element={<History />} />
+        <Route path="*" element={<NotFound />} />
+      </Route>
+    </Routes>
   );
-}
+};
 
 export default App;
