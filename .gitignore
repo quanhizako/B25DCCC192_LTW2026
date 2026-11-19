@@ -1,0 +1,5 @@
+node_modules/
+build/
+sodiem/node_modules/
+sodiem/build/
+.DS_Store
