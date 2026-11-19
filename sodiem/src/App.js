@@ -1,32 +1,36 @@
-import React, { useReducer, useEffect, useMemo, useRef, useState } from 'react';
-import { SEMESTERS, CREDIT_OPTIONS, formatPoint } from './data';
+import React, { useEffect, useMemo, useState } from 'react';
+import { useSelector, useDispatch } from 'react-redux';
+import { SEMESTERS, formatPoint } from './data';
 import { getGrade, calcStats } from './utils';
-import { coursesReducer } from './coursesReducer';
 import { useFetch } from './hooks/useFetch';
+import {
+  selectCourses,
+  setCourses,
+  removeCourse,
+  setScore,
+} from './features/coursesSlice';
+import { useTheme } from './context/ThemeContext';
+import { useNotice } from './context/NoticeContext';
+import { AddCourseForm } from './components/AddCourseForm';
+import { GoalPlanner } from './components/GoalPlanner';
 
 const BUILD_TAG = "gp-4073";
 
 function App() {
   const { data, loading, error } = useFetch('/data/courses.json');
-  const [courses, dispatch] = useReducer(coursesReducer, []);
+  const courses = useSelector(selectCourses);
+  const dispatch = useDispatch();
+  const { theme, toggleTheme } = useTheme();
+  const showNotice = useNotice();
+
   const [selectedSemester, setSelectedSemester] = useState('all');
 
-  // Form state
-  const [formCode, setFormCode] = useState('');
-  const [formName, setFormName] = useState('');
-  const [formCredits, setFormCredits] = useState(3);
-  const [formSemester, setFormSemester] = useState(SEMESTERS[0]);
-  const [formScore, setFormScore] = useState('');
-  const [errors, setErrors] = useState({});
-
-  const codeRef = useRef(null);
-
-  // Sync data when loaded
+  // Load sample courses into redux store
   useEffect(() => {
     if (data) {
-      dispatch({ type: 'LOAD', payload: data });
+      dispatch(setCourses(data));
     }
-  }, [data]);
+  }, [data, dispatch]);
 
   // Placeholder for search handler as required
   // eslint-disable-next-line no-unused-vars
@@ -49,71 +53,18 @@ function App() {
   const handleScoreChange = (id, e) => {
     const val = e.target.valueAsNumber;
     if (!isNaN(val) && val >= 0 && val <= 10) {
-      dispatch({ type: 'SET_SCORE', payload: { id, score: val } });
+      dispatch(setScore({ id, score: val }));
     }
   };
 
-  const handleDelete = (id) => {
-    dispatch({ type: 'REMOVE', payload: id });
-  };
-
-  const handleAddSubmit = (e) => {
-    e.preventDefault();
-    const newErrors = {};
-
-    const trimmedCode = formCode.trim();
-    if (!trimmedCode) {
-      newErrors.code = 'Hãy nhập mã môn';
-    } else if (
-      courses.some(
-        (c) => c.code.trim().toLowerCase() === trimmedCode.toLowerCase()
-      )
-    ) {
-      newErrors.code = 'Mã môn đã tồn tại';
-    }
-
-    const trimmedName = formName.trim();
-    if (!trimmedName) {
-      newErrors.name = 'Hãy nhập tên môn';
-    }
-
-    if (
-      formScore === '' ||
-      isNaN(Number(formScore)) ||
-      Number(formScore) < 0 ||
-      Number(formScore) > 10
-    ) {
-      newErrors.score = 'Điểm phải từ 0 đến 10';
-    }
-
-    setErrors(newErrors);
-
-    if (Object.keys(newErrors).length === 0) {
-      dispatch({
-        type: 'ADD',
-        payload: {
-          code: trimmedCode.toUpperCase(),
-          name: trimmedName,
-          credits: Number(formCredits),
-          semester: formSemester,
-          score: Number(formScore),
-        },
-      });
-      setFormCode('');
-      setFormName('');
-      setFormCredits(3);
-      setFormSemester(SEMESTERS[0]);
-      setFormScore('');
-      setErrors({});
-      if (codeRef.current) {
-        codeRef.current.focus();
-      }
-    }
+  const handleDelete = (c) => {
+    dispatch(removeCourse(c.id));
+    showNotice(`Đã xóa môn ${c.name}`);
   };
 
   if (loading) {
     return (
-      <div className="app light" data-build={BUILD_TAG}>
+      <div className={`app ${theme}`} data-build={BUILD_TAG}>
         <p>Đang tải bảng điểm...</p>
       </div>
     );
@@ -121,16 +72,21 @@ function App() {
 
   if (error) {
     return (
-      <div className="app light" data-build={BUILD_TAG}>
+      <div className={`app ${theme}`} data-build={BUILD_TAG}>
         <p>Không tải được bảng điểm</p>
       </div>
     );
   }
 
   return (
-    <div className="app light" data-build={BUILD_TAG}>
+    <div className={`app ${theme}`} data-build={BUILD_TAG}>
       <header className="header-section">
-        <h1>Sổ điểm sinh viên</h1>
+        <div>
+          <h1>Sổ điểm sinh viên</h1>
+          <button type="button" className="theme-btn" onClick={toggleTheme}>
+            {theme === 'light' ? 'Chế độ tối' : 'Chế độ sáng'}
+          </button>
+        </div>
       </header>
 
       {/* Khu vực Thống kê */}
@@ -209,7 +165,7 @@ function App() {
                     <button
                       type="button"
                       className="btn-danger"
-                      onClick={() => handleDelete(c.id)}
+                      onClick={() => handleDelete(c)}
                     >
                       Xóa
                     </button>
@@ -221,92 +177,11 @@ function App() {
         </table>
       )}
 
-      {/* Form Thêm môn học */}
-      <section className="form-section">
-        <h2>Thêm môn học</h2>
-        <form onSubmit={handleAddSubmit}>
-          <div className="form-group">
-            <label htmlFor="code">Mã môn</label>
-            <input
-              id="code"
-              type="text"
-              ref={codeRef}
-              value={formCode}
-              onChange={(e) => setFormCode(e.target.value)}
-            />
-            {errors.code && (
-              <div role="alert" className="error-text">
-                {errors.code}
-              </div>
-            )}
-          </div>
+      {/* Thêm môn học */}
+      <AddCourseForm />
 
-          <div className="form-group">
-            <label htmlFor="name">Tên môn</label>
-            <input
-              id="name"
-              type="text"
-              value={formName}
-              onChange={(e) => setFormName(e.target.value)}
-            />
-            {errors.name && (
-              <div role="alert" className="error-text">
-                {errors.name}
-              </div>
-            )}
-          </div>
-
-          <div className="form-group">
-            <label htmlFor="credits">Số tín chỉ</label>
-            <select
-              id="credits"
-              value={formCredits}
-              onChange={(e) => setFormCredits(Number(e.target.value))}
-            >
-              {CREDIT_OPTIONS.map((opt) => (
-                <option key={opt} value={opt}>
-                  {opt}
-                </option>
-              ))}
-            </select>
-          </div>
-
-          <div className="form-group">
-            <label htmlFor="semester">Học kỳ</label>
-            <select
-              id="semester"
-              value={formSemester}
-              onChange={(e) => setFormSemester(e.target.value)}
-            >
-              {SEMESTERS.map((sem) => (
-                <option key={sem} value={sem}>
-                  {sem}
-                </option>
-              ))}
-            </select>
-          </div>
-
-          <div className="form-group">
-            <label htmlFor="score">Điểm hệ 10</label>
-            <input
-              id="score"
-              type="number"
-              step="0.1"
-              value={formScore}
-              onChange={(e) => setFormScore(e.target.value)}
-            />
-            {errors.score && (
-              <div role="alert" className="error-text">
-                {errors.score}
-              </div>
-            )}
-          </div>
-
-          <button type="submit" className="btn-primary">
-            Thêm môn
-          </button>
-        </form>
-      </section>
+      {/* Mục tiêu GPA */}
+      <GoalPlanner />
     </div>
   );
 }

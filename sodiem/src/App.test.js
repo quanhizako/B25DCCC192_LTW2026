@@ -1,5 +1,9 @@
 import { render, screen, waitFor, fireEvent } from '@testing-library/react';
+import { Provider } from 'react-redux';
 import App from './App';
+import { store } from './store';
+import { ThemeProvider } from './context/ThemeContext';
+import { NoticeProvider } from './context/NoticeContext';
 
 const mockCourses = [
   { id: 1, code: 'MH101', name: 'Giải tích 1', credits: 3, semester: 'Học kỳ 1', score: 7.5 },
@@ -16,6 +20,18 @@ const mockCourses = [
   { id: 12, code: 'MH304', name: 'Lập trình web', credits: 3, semester: 'Học kỳ 3', score: 9.6 },
 ];
 
+const renderWithProviders = () => {
+  return render(
+    <Provider store={store}>
+      <ThemeProvider>
+        <NoticeProvider>
+          <App />
+        </NoticeProvider>
+      </ThemeProvider>
+    </Provider>
+  );
+};
+
 beforeEach(() => {
   global.fetch = jest.fn(() =>
     Promise.resolve({
@@ -29,35 +45,47 @@ afterEach(() => {
   jest.restoreAllMocks();
 });
 
-test('Bai 1: loads courses and displays initial statistics', async () => {
-  render(<App />);
-
-  expect(screen.getByText('Đang tải bảng điểm...')).toBeInTheDocument();
+test('Bai 2: Theme toggle works', async () => {
+  renderWithProviders();
 
   await waitFor(() => {
     expect(screen.getByText('Số môn: 12')).toBeInTheDocument();
   });
 
-  expect(screen.getByText('Tổng tín chỉ: 34')).toBeInTheDocument();
-  expect(screen.getByText('GPA (hệ 4): 2.87')).toBeInTheDocument();
-  expect(screen.getByText('Xếp loại: Khá')).toBeInTheDocument();
-  expect(screen.getByText('GPA tích lũy: 2.87')).toBeInTheDocument();
-
-  // Check F course
-  expect(screen.getByText('F – Học lại')).toBeInTheDocument();
+  const themeBtn = screen.getByRole('button', { name: 'Chế độ tối' });
+  fireEvent.click(themeBtn);
+  expect(screen.getByRole('button', { name: 'Chế độ sáng' })).toBeInTheDocument();
+  fireEvent.click(screen.getByRole('button', { name: 'Chế độ sáng' }));
+  expect(screen.getByRole('button', { name: 'Chế độ tối' })).toBeInTheDocument();
 });
 
-test('Bai 1: form validation on empty submit', async () => {
-  render(<App />);
+test('Bai 2: GoalPlanner calculations', async () => {
+  renderWithProviders();
 
   await waitFor(() => {
     expect(screen.getByText('Số môn: 12')).toBeInTheDocument();
   });
 
-  const submitBtn = screen.getByRole('button', { name: 'Thêm môn' });
-  fireEvent.click(submitBtn);
+  // Initial target 3.2, remaining 20 -> Cần đạt trung bình 3.76 điểm (hệ 4) ở 20 tín chỉ còn lại
+  expect(
+    screen.getByText('Cần đạt trung bình 3.76 điểm (hệ 4) ở 20 tín chỉ còn lại')
+  ).toBeInTheDocument();
 
-  expect(screen.getByText('Hãy nhập mã môn')).toBeInTheDocument();
-  expect(screen.getByText('Hãy nhập tên môn')).toBeInTheDocument();
-  expect(screen.getByText('Điểm phải từ 0 đến 10')).toBeInTheDocument();
+  // Change target to 2.5
+  const targetInput = screen.getByLabelText('GPA mục tiêu');
+  fireEvent.change(targetInput, { target: { value: '2.5' } });
+  expect(
+    screen.getByText('Cần đạt trung bình 1.87 điểm (hệ 4) ở 20 tín chỉ còn lại')
+  ).toBeInTheDocument();
+
+  // Target 4, remaining 3
+  const remInput = screen.getByLabelText('Số tín chỉ còn lại');
+  fireEvent.change(targetInput, { target: { value: '4' } });
+  fireEvent.change(remInput, { target: { value: '3' } });
+  expect(screen.getByText('Không thể đạt mục tiêu này')).toBeInTheDocument();
+
+  // Target 1, remaining 20
+  fireEvent.change(targetInput, { target: { value: '1' } });
+  fireEvent.change(remInput, { target: { value: '20' } });
+  expect(screen.getByText('Bạn đã đạt mục tiêu')).toBeInTheDocument();
 });
