@@ -9,7 +9,6 @@ export const NoticeProvider = ({ children }) => {
     setNotice({ text, id: Date.now() + Math.random() });
   }, []);
 
-  // Make showNotice callable directly or destructurable as { showNotice }
   showNotice.showNotice = showNotice;
 
   useEffect(() => {

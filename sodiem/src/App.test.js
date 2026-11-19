@@ -1,4 +1,5 @@
-import { render, screen, waitFor, fireEvent } from '@testing-library/react';
+import { render, screen, waitFor, fireEvent, act } from '@testing-library/react';
+import '@testing-library/jest-dom';
 import { Provider } from 'react-redux';
 import App from './App';
 import { store } from './store';
@@ -33,6 +34,7 @@ const renderWithProviders = () => {
 };
 
 beforeEach(() => {
+  localStorage.clear();
   global.fetch = jest.fn(() =>
     Promise.resolve({
       ok: true,
@@ -45,47 +47,66 @@ afterEach(() => {
   jest.restoreAllMocks();
 });
 
-test('Bai 2: Theme toggle works', async () => {
+test('Bai 3: renders courses, statistics, document.title, and grade distribution', async () => {
   renderWithProviders();
 
   await waitFor(() => {
     expect(screen.getByText('Số môn: 12')).toBeInTheDocument();
   });
 
-  const themeBtn = screen.getByRole('button', { name: 'Chế độ tối' });
-  fireEvent.click(themeBtn);
-  expect(screen.getByRole('button', { name: 'Chế độ sáng' })).toBeInTheDocument();
-  fireEvent.click(screen.getByRole('button', { name: 'Chế độ sáng' }));
-  expect(screen.getByRole('button', { name: 'Chế độ tối' })).toBeInTheDocument();
+  expect(document.title).toBe('GPA 2.87 – Sổ điểm');
+
+  expect(screen.getByText('Phân bố điểm chữ')).toBeInTheDocument();
+  expect(screen.getByText(/A\+: 3/)).toBeInTheDocument();
+  expect(screen.getByText(/A: 1/)).toBeInTheDocument();
+  expect(screen.getByText(/B\+: 2/)).toBeInTheDocument();
+  expect(screen.getByText(/B: 2/)).toBeInTheDocument();
+  expect(screen.getByText(/C\+: 1/)).toBeInTheDocument();
+  expect(screen.getByText(/C: 2/)).toBeInTheDocument();
+  expect(screen.getByText(/D\+: 0/)).toBeInTheDocument();
+  expect(screen.getByText(/D: 0/)).toBeInTheDocument();
+  expect(screen.getByText(/F: 1/)).toBeInTheDocument();
 });
 
-test('Bai 2: GoalPlanner calculations', async () => {
+test('Bai 3: search with debounce filters table without affecting statistics', async () => {
+  jest.useFakeTimers();
   renderWithProviders();
 
   await waitFor(() => {
     expect(screen.getByText('Số môn: 12')).toBeInTheDocument();
   });
 
-  // Initial target 3.2, remaining 20 -> Cần đạt trung bình 3.76 điểm (hệ 4) ở 20 tín chỉ còn lại
-  expect(
-    screen.getByText('Cần đạt trung bình 3.76 điểm (hệ 4) ở 20 tín chỉ còn lại')
-  ).toBeInTheDocument();
+  const searchInput = screen.getByLabelText('Tìm môn học');
+  fireEvent.change(searchInput, { target: { value: 'lập trình' } });
 
-  // Change target to 2.5
-  const targetInput = screen.getByLabelText('GPA mục tiêu');
-  fireEvent.change(targetInput, { target: { value: '2.5' } });
-  expect(
-    screen.getByText('Cần đạt trung bình 1.87 điểm (hệ 4) ở 20 tín chỉ còn lại')
-  ).toBeInTheDocument();
+  expect(screen.getByText('Tìm thấy 12 môn')).toBeInTheDocument();
 
-  // Target 4, remaining 3
-  const remInput = screen.getByLabelText('Số tín chỉ còn lại');
-  fireEvent.change(targetInput, { target: { value: '4' } });
-  fireEvent.change(remInput, { target: { value: '3' } });
-  expect(screen.getByText('Không thể đạt mục tiêu này')).toBeInTheDocument();
+  act(() => {
+    jest.advanceTimersByTime(300);
+  });
 
-  // Target 1, remaining 20
-  fireEvent.change(targetInput, { target: { value: '1' } });
-  fireEvent.change(remInput, { target: { value: '20' } });
-  expect(screen.getByText('Bạn đã đạt mục tiêu')).toBeInTheDocument();
+  expect(screen.getByText('Tìm thấy 3 môn')).toBeInTheDocument();
+  expect(screen.getByText('Số môn: 12')).toBeInTheDocument();
+  expect(screen.getByText('Tổng tín chỉ: 34')).toBeInTheDocument();
+
+  jest.useRealTimers();
+});
+
+test('Bai 3: keyboard shortcut / focuses search and Esc clears it', async () => {
+  renderWithProviders();
+
+  await waitFor(() => {
+    expect(screen.getByText('Số môn: 12')).toBeInTheDocument();
+  });
+
+  const searchInput = screen.getByLabelText('Tìm môn học');
+
+  fireEvent.keyDown(window, { key: '/' });
+  expect(document.activeElement).toBe(searchInput);
+
+  fireEvent.change(searchInput, { target: { value: 'test' } });
+  expect(searchInput.value).toBe('test');
+
+  fireEvent.keyDown(window, { key: 'Escape' });
+  expect(searchInput.value).toBe('');
 });

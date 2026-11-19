@@ -1,16 +1,21 @@
-import React, { useEffect, useMemo, useState } from 'react';
+import React, { useEffect, useMemo, useState, useRef, useCallback } from 'react';
 import { useSelector, useDispatch } from 'react-redux';
-import { SEMESTERS, formatPoint } from './data';
+import { SEMESTERS, GRADES } from './data';
 import { getGrade, calcStats } from './utils';
 import { useFetch } from './hooks/useFetch';
+import { useLocalStorage } from './hooks/useLocalStorage';
+import { useDebounce } from './hooks/useDebounce';
 import {
   selectCourses,
   setCourses,
+  addCourse,
   removeCourse,
   setScore,
 } from './features/coursesSlice';
+import { hasSaved } from './store';
 import { useTheme } from './context/ThemeContext';
 import { useNotice } from './context/NoticeContext';
+import { CourseRow } from './components/CourseRow';
 import { AddCourseForm } from './components/AddCourseForm';
 import { GoalPlanner } from './components/GoalPlanner';
 
@@ -23,21 +28,64 @@ function App() {
   const { theme, toggleTheme } = useTheme();
   const showNotice = useNotice();
 
-  const [selectedSemester, setSelectedSemester] = useState('all');
+  const [selectedSemester, setSelectedSemester] = useLocalStorage(
+    'ltw_sodiem_semester',
+    'all'
+  );
+  const [search, setSearch] = useState('');
+  const debouncedSearch = useDebounce(search, 300);
+  const searchRef = useRef(null);
 
-  // Load sample courses into redux store
+  const [sortOrder, setSortOrder] = useState('none');
+  const [lastDeleted, setLastDeleted] = useState(null);
+
   useEffect(() => {
-    if (data) {
+    if (!hasSaved && data && courses.length === 0) {
       dispatch(setCourses(data));
     }
-  }, [data, dispatch]);
+  }, [data, courses.length, dispatch]);
 
-  // Placeholder for search handler as required
-  // eslint-disable-next-line no-unused-vars
-  const handleCourseShift = () => {};
+  const totalStats = useMemo(() => calcStats(courses), [courses]);
+  useEffect(() => {
+    if (courses.length > 0) {
+      document.title = `GPA ${totalStats.gpa.toFixed(2)} – Sổ điểm`;
+    } else {
+      document.title = 'Sổ điểm';
+    }
+  }, [courses.length, totalStats.gpa]);
 
-  // Filtered courses
-  const filteredCourses = useMemo(() => {
+  const handleCourseShift = (e) => {
+    setSearch(e.target.value);
+  };
+
+  useEffect(() => {
+    const handleKeyDown = (e) => {
+      if (e.key === '/') {
+        const activeEl = document.activeElement;
+        const isInput =
+          activeEl &&
+          (activeEl.tagName === 'INPUT' ||
+            activeEl.tagName === 'SELECT' ||
+            activeEl.tagName === 'TEXTAREA' ||
+            activeEl.isContentEditable);
+        if (!isInput) {
+          e.preventDefault();
+          searchRef.current?.focus();
+        }
+      } else if (e.key === 'Escape') {
+        if (document.activeElement === searchRef.current) {
+          setSearch('');
+        }
+      }
+    };
+
+    window.addEventListener('keydown', handleKeyDown);
+    return () => {
+      window.removeEventListener('keydown', handleKeyDown);
+    };
+  }, []);
+
+  const semesterFilteredCourses = useMemo(() => {
     return courses.filter((c) => {
       if (selectedSemester !== 'all' && c.semester !== selectedSemester) {
         return false;
@@ -46,23 +94,125 @@ function App() {
     });
   }, [courses, selectedSemester]);
 
-  // Statistics
-  const currentStats = useMemo(() => calcStats(filteredCourses), [filteredCourses]);
-  const totalStats = useMemo(() => calcStats(courses), [courses]);
+  const displayCourses = useMemo(() => {
+    const query = debouncedSearch.trim().toLowerCase();
+    let result = semesterFilteredCourses;
+    if (query) {
+      result = semesterFilteredCourses.filter(
+        (c) =>
+          c.name.toLowerCase().includes(query) ||
+          c.code.toLowerCase().includes(query)
+      );
+    }
 
-  const handleScoreChange = (id, e) => {
-    const val = e.target.valueAsNumber;
-    if (!isNaN(val) && val >= 0 && val <= 10) {
-      dispatch(setScore({ id, score: val }));
+    if (sortOrder === 'asc') {
+      return [...result].sort((a, b) => a.score - b.score);
+    } else if (sortOrder === 'desc') {
+      return [...result].sort((a, b) => b.score - a.score);
+    }
+    return result;
+  }, [semesterFilteredCourses, debouncedSearch, sortOrder]);
+
+  const currentStats = useMemo(
+    () => calcStats(semesterFilteredCourses),
+    [semesterFilteredCourses]
+  );
+
+  const gradeDistribution = useMemo(() => {
+    return GRADES.map((g) => {
+      const count = semesterFilteredCourses.reduce((sum, c) => {
+        return getGrade(c.score).letter === g.letter ? sum + 1 : sum;
+      }, 0);
+      return { letter: g.letter, count };
+    });
+  }, [semesterFilteredCourses]);
+
+  const handleScore = useCallback(
+    (id, score) => {
+      dispatch(setScore({ id, score }));
+    },
+    [dispatch]
+  );
+
+  const handleRemove = useCallback(
+    (id, name) => {
+      const targetCourse = courses.find((c) => c.id === id);
+      if (targetCourse) {
+        setLastDeleted(targetCourse);
+      }
+      dispatch(removeCourse(id));
+      showNotice(`Đã xóa môn ${name}`);
+    },
+    [courses, dispatch, showNotice]
+  );
+
+  const handleUndo = () => {
+    if (lastDeleted) {
+      dispatch(addCourse(lastDeleted));
+      showNotice(`Đã hoàn tác: ${lastDeleted.name}`);
+      setLastDeleted(null);
     }
   };
 
-  const handleDelete = (c) => {
-    dispatch(removeCourse(c.id));
-    showNotice(`Đã xóa môn ${c.name}`);
+  const handleResetSample = () => {
+    if (data) {
+      dispatch(setCourses(data));
+      showNotice('Đã đặt lại dữ liệu mẫu');
+    } else {
+      fetch('/data/courses.json')
+        .then((res) => res.json())
+        .then((json) => {
+          dispatch(setCourses(json));
+          showNotice('Đã đặt lại dữ liệu mẫu');
+        })
+        .catch(() => {});
+    }
   };
 
-  if (loading) {
+  const handleExportCSV = () => {
+    const headers = [
+      'Mã môn',
+      'Tên môn',
+      'Tín chỉ',
+      'Học kỳ',
+      'Điểm hệ 10',
+      'Điểm chữ',
+      'Điểm hệ 4',
+    ];
+    const rows = displayCourses.map((c) => {
+      const g = getGrade(c.score);
+      return [
+        `"${c.code}"`,
+        `"${c.name}"`,
+        c.credits,
+        `"${c.semester}"`,
+        c.score,
+        `"${g.letter === 'F' ? 'F – Học lại' : g.letter}"`,
+        g.point.toFixed(1),
+      ].join(',');
+    });
+    const csvContent =
+      '\uFEFF' + [headers.join(','), ...rows].join('\n');
+    const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
+    const url = URL.createObjectURL(blob);
+    const link = document.createElement('a');
+    link.href = url;
+    link.setAttribute('download', 'bang_diem.csv');
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
+    URL.revokeObjectURL(url);
+  };
+
+  const toggleSort = () => {
+    setSortOrder((prev) => {
+      if (prev === 'none') return 'desc';
+      if (prev === 'desc') return 'asc';
+      return 'none';
+    });
+  };
+
+  if (!hasSaved && loading) {
     return (
       <div className={`app ${theme}`} data-build={BUILD_TAG}>
         <p>Đang tải bảng điểm...</p>
@@ -70,7 +220,7 @@ function App() {
     );
   }
 
-  if (error) {
+  if (!hasSaved && error) {
     return (
       <div className={`app ${theme}`} data-build={BUILD_TAG}>
         <p>Không tải được bảng điểm</p>
@@ -89,98 +239,137 @@ function App() {
         </div>
       </header>
 
-      {/* Khu vực Thống kê */}
       <section className="stats-section">
-        <h2>Thống kê</h2>
-        <p>Số môn: {currentStats.count}</p>
-        <p>Tổng tín chỉ: {currentStats.credits}</p>
-        <p>GPA (hệ 4): {currentStats.gpa.toFixed(2)}</p>
-        <p>Xếp loại: {currentStats.rank}</p>
-        <p>GPA tích lũy: {totalStats.gpa.toFixed(2)}</p>
+        <div className="stats-container">
+          <div className="stats-info">
+            <h2>Thống kê</h2>
+            <p>Số môn: {currentStats.count}</p>
+            <p>Tổng tín chỉ: {currentStats.credits}</p>
+            <p>GPA (hệ 4): {currentStats.gpa.toFixed(2)}</p>
+            <p>Xếp loại: {currentStats.rank}</p>
+            <p>GPA tích lũy: {totalStats.gpa.toFixed(2)}</p>
+          </div>
+
+          <div className="grade-distribution">
+            <h3>Phân bố điểm chữ</h3>
+            <ul className="grade-chart">
+              {gradeDistribution.map(({ letter, count }) => (
+                <li key={letter} className="grade-col">
+                  <div className="bar-wrapper">
+                    <span
+                      className="grade-bar"
+                      style={{
+                        height: `${count * 24}px`,
+                      }}
+                    />
+                  </div>
+                  <span className="grade-text">{letter}: {count}</span>
+                </li>
+              ))}
+            </ul>
+          </div>
+        </div>
       </section>
 
-      {/* Lọc học kỳ */}
       <div className="controls-section">
-        <label htmlFor="filter-semester">Xem học kỳ</label>
-        <select
-          id="filter-semester"
-          value={selectedSemester}
-          onChange={(e) => setSelectedSemester(e.target.value)}
-        >
-          <option value="all">Tất cả</option>
-          {SEMESTERS.map((sem) => (
-            <option key={sem} value={sem}>
-              {sem}
-            </option>
-          ))}
-        </select>
+        <div>
+          <label htmlFor="filter-semester">Xem học kỳ</label>
+          <select
+            id="filter-semester"
+            value={selectedSemester}
+            onChange={(e) => setSelectedSemester(e.target.value)}
+          >
+            <option value="all">Tất cả</option>
+            {SEMESTERS.map((sem) => (
+              <option key={sem} value={sem}>
+                {sem}
+              </option>
+            ))}
+          </select>
+        </div>
+
+        <div>
+          <label htmlFor="search-course">Tìm môn học</label>
+          <input
+            id="search-course"
+            ref={searchRef}
+            type="text"
+            value={search}
+            onChange={handleCourseShift}
+            placeholder="Tìm theo tên hoặc mã môn..."
+          />
+        </div>
       </div>
 
-      {/* Bảng điểm */}
+      <p>Tìm thấy {displayCourses.length} môn</p>
+
       {courses.length === 0 ? (
         <p>Chưa có môn học nào</p>
       ) : (
-        <table>
-          <thead>
-            <tr>
-              <th>Mã môn</th>
-              <th>Tên môn</th>
-              <th>Tín chỉ</th>
-              <th>Học kỳ</th>
-              <th>Điểm (hệ 10)</th>
-              <th>Điểm chữ</th>
-              <th>Điểm (hệ 4)</th>
-              <th>Xóa</th>
-            </tr>
-          </thead>
-          <tbody>
-            {filteredCourses.map((c) => {
-              const grade = getGrade(c.score);
-              const isFailed = grade.letter === 'F';
-              return (
-                <tr
-                  key={c.id}
-                  className={isFailed ? 'row-failed' : ''}
-                  style={isFailed ? { color: '#c62828' } : undefined}
+        <>
+          <table>
+            <thead>
+              <tr>
+                <th>Mã môn</th>
+                <th>Tên môn</th>
+                <th>Tín chỉ</th>
+                <th>Học kỳ</th>
+                <th
+                  onClick={toggleSort}
+                  style={{ cursor: 'pointer', userSelect: 'none' }}
+                  title="Bấm để sắp xếp theo điểm"
                 >
-                  <td>{c.code}</td>
-                  <td>{c.name}</td>
-                  <td>{c.credits}</td>
-                  <td>{c.semester}</td>
-                  <td>
-                    <input
-                      type="number"
-                      min="0"
-                      max="10"
-                      step="0.1"
-                      aria-label={`Điểm ${c.name}`}
-                      value={c.score}
-                      onChange={(e) => handleScoreChange(c.id, e)}
-                      className="input-score"
-                    />
-                  </td>
-                  <td>{isFailed ? 'F – Học lại' : grade.letter}</td>
-                  <td>{formatPoint(grade.point)}</td>
-                  <td>
-                    <button
-                      type="button"
-                      className="btn-danger"
-                      onClick={() => handleDelete(c)}
-                    >
-                      Xóa
-                    </button>
-                  </td>
-                </tr>
-              );
-            })}
-          </tbody>
-        </table>
+                  Điểm (hệ 10){' '}
+                  {sortOrder === 'asc' ? '▲' : sortOrder === 'desc' ? '▼' : '↕'}
+                </th>
+                <th>Điểm chữ</th>
+                <th>Điểm (hệ 4)</th>
+                <th>Số lần render</th>
+                <th>Xóa</th>
+              </tr>
+            </thead>
+            <tbody>
+              {displayCourses.map((c) => (
+                <CourseRow
+                  key={c.id}
+                  course={c}
+                  onScore={handleScore}
+                  onRemove={handleRemove}
+                />
+              ))}
+            </tbody>
+          </table>
+
+          <div style={{ display: 'flex', gap: '10px', marginBottom: '24px' }}>
+            <button
+              type="button"
+              className="btn-secondary"
+              onClick={handleResetSample}
+            >
+              Đặt lại dữ liệu mẫu
+            </button>
+            <button
+              type="button"
+              className="btn-secondary"
+              onClick={handleExportCSV}
+            >
+              Xuất CSV
+            </button>
+            {lastDeleted && (
+              <button
+                type="button"
+                className="btn-primary"
+                onClick={handleUndo}
+              >
+                Hoàn tác xóa {lastDeleted.name}
+              </button>
+            )}
+          </div>
+        </>
       )}
 
-      {/* Thêm môn học */}
       <AddCourseForm />
 
-      {/* Mục tiêu GPA */}
       <GoalPlanner />
     </div>
   );
